@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Outdoor Event Planner</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f0f4f8;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 {
+    color: #0056b3;
+  }
+  label {
+    display: block;
+    margin: 10px 0 5px;
+  }
+  input {
+    width: 300px;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+  button {
+    background-color: #0056b3;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    margin-top: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  button:hover {
+    background-color: #004494;
+  }
+  #eventsList {
+    margin-top: 30px;
+  }
+  .event {
+    background: #fff;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  .weather-status {
+    font-size: 0.9em;
+    color: #555;
+  }
+  #weatherDashboard {
+    background: #e0f7fa;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Outdoor Event Planner</h1>
+
+<div id="weatherDashboard">
+  <h2>Current Weather</h2>
+  <p id="currentWeather">Loading...</p>
+</div>
+
+<h2>Add New Event</h2>
+<label for="eventTitle">Event Name:</label>
+<input type="text" id="eventTitle">
+
+<label for="eventCity">City:</label>
+<input type="text" id="eventCity">
+
+<label for="eventDate">Date:</label>
+<input type="date" id="eventDate">
+
+<button onclick="addEvent()">Add Event</button>
+
+<h2>Upcoming Events</h2>
+<div id="eventsList"></div>
+
+<script>
+const BASE_URL = "http://127.0.0.1:8000";
+
+// Correct endpoint for your backend: /weather/weather/{city}
+async function getWeatherForCity(city) {
+  try {
+    const res = await fetch(`${BASE_URL}/weather/weather/${city}`);
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Load current weather for default city
+async function loadCurrentWeather() {
+  const city = "Pune"; // default city
+  const data = await getWeatherForCity(city);
+
+  if (data && data.description && data.temperature) {
+    document.getElementById("currentWeather").textContent =
+      `Weather in ${city}: ${data.description}, ${data.temperature}°C`;
+  } else {
+    document.getElementById("currentWeather").textContent =
+      "❌ Could not load weather.";
+  }
+}
+
+// Load events and their weather
+async function loadEvents() {
+  try {
+    const res = await fetch(`${BASE_URL}/events/`);
+    const events = await res.json();
+
+    const eventsList = document.getElementById("eventsList");
+    eventsList.innerHTML = "";
+
+    if (events.length === 0) {
+      eventsList.innerHTML = "<p>No events yet.</p>";
+      return;
+    }
+
+    for (const event of events) {
+      const div = document.createElement("div");
+      div.className = "event";
+      div.innerHTML = `
+        <strong>${event.name}</strong> | 📍 ${event.location} | 📅 ${event.date}<br>
+        <span class="weather-status">🌤️ Loading weather...</span>
+      `;
+      eventsList.appendChild(div);
+
+      const weatherData = await getWeatherForCity(event.location);
+      if (weatherData && weatherData.description && weatherData.temperature) {
+        div.querySelector(".weather-status").textContent =
+          `🌤️ Weather: ${weatherData.description}, Temp: ${weatherData.temperature}°C`;
+      } else {
+        div.querySelector(".weather-status").textContent =
+          "🌤️ Weather: N/A";
+      }
+    }
+  } catch (error) {
+    alert("❌ Could not load events: " + error.message);
+  }
+}
+
+// Add a new event
+async function addEvent() {
+  const title = document.getElementById("eventTitle").value.trim();
+  const city = document.getElementById("eventCity").value.trim();
+  const date = document.getElementById("eventDate").value;
+
+  if (!title || !city || !date) {
+    alert("❌ Please fill in all fields (name, city, date)");
+    return;
+  }
+
+  const params = new URLSearchParams({
+    name: title,
+    location: city,
+    date_: date
+  });
+
+  try {
+    const res = await fetch(`${BASE_URL}/events/?${params.toString()}`, {
+      method: "POST"
+    });
+
+    if (res.ok) {
+      document.getElementById("eventTitle").value = "";
+      document.getElementById("eventCity").value = "";
+      document.getElementById("eventDate").value = "";
+      loadEvents();
+    } else {
+      const data = await res.json();
+      alert(`❌ Error: ${data.detail || "Could not add event"}`);
+    }
+  } catch (error) {
+    alert("❌ Error: " + error.message);
+  }
+}
+
+// Initialize
+loadCurrentWeather();
+loadEvents();
+</script>
+
+</body>
+</html>
